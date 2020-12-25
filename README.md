@@ -119,7 +119,7 @@ export default {
 
 属性`vaildcount`是符合所有抽奖条件的抽奖参与者数量，`result`是中奖者的uid列表。
 
-另请开发人员注意，配置的接口定义在源代码中是在主函数前定义的`interface Result`。
+另请开发人员注意，结果的接口定义在源代码中是在主函数前定义的`interface Result`。
 
 可以切换到`network`选项卡，查看工具发起了哪些请求，如图：
 
