@@ -3,7 +3,7 @@
  * Copyright 2020 stackinspector(进栈检票). MIT Lincese.
  */
 
-type Obj = Record<string, unknown>
+type Dict = Record<string, unknown>
 
 type Needs = 'like' | 'reply' | 'repost'
 
@@ -27,7 +27,7 @@ interface Result {
   result: number[]
 }
 
-interface Data {
+interface Filtee {
   uid: number
   content?: string
   time: number
@@ -47,7 +47,7 @@ interface Data {
     return result
   }
 
-  const filter = (data: Data) =>
+  const filter = (data: Filtee) =>
     (data.time < config.endtime)
     && !(data.uid in config.blockuid)
     && (('content' in data && config.blockword.length !== 0) ? ((content: string): boolean => {
@@ -68,10 +68,10 @@ interface Data {
 
       do {
 
-        const resp = await req(url + pn) as Obj
+        const resp = await req(url + pn) as Dict
 
-        for (const raw of (resp.item_likes as Obj[])) {
-          const data: Data = {
+        for (const raw of (resp.item_likes as Dict[])) {
+          const data: Filtee = {
             uid: raw.uid as number,
             time: raw.time as number,
           }
@@ -94,13 +94,13 @@ interface Data {
 
       do {
 
-        const resp = await req(url + pn) as Obj
+        const resp = await req(url + pn) as Dict
 
-        for (const raw of (resp.items as Obj[])) {
-          const data: Data = {
-            uid: (raw.desc as Obj).uid as number,
-            content: (JSON.parse(raw.card as string).item as Obj).content as string,
-            time: (raw.desc as Obj).timestamp as number,
+        for (const raw of (resp.items as Dict[])) {
+          const data: Filtee = {
+            uid: (raw.desc as Dict).uid as number,
+            content: (JSON.parse(raw.card as string).item as Dict).content as string,
+            time: (raw.desc as Dict).timestamp as number,
           }
           if (filter(data)) set.add(data.uid)
         }
@@ -114,7 +114,7 @@ interface Data {
 
     reply: async (tid, set) => {
 
-      const desc = ((await req(`https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${tid}`) as Obj).card as Obj).desc as Obj
+      const desc = ((await req(`https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${tid}`) as Dict).card as Dict).desc as Dict
       const url = `https://api.bilibili.com/x/v2/reply?type=${(desc.r_type as number) ? 11 : 17}&oid=${desc.rid as number}&sort=0&ps=20&pn=`
 
       let flag = true
@@ -122,14 +122,14 @@ interface Data {
 
       do {
 
-        const resp = await req(url + pn) as Obj
+        const resp = await req(url + pn) as Dict
 
         if (resp.replies !== null) {
 
-          for (const raw of (resp.replies as Obj[])) {
-            const data: Data = {
+          for (const raw of (resp.replies as Dict[])) {
+            const data: Filtee = {
               uid: raw.mid as number,
-              content: (raw.content as Obj).message as string,
+              content: (raw.content as Dict).message as string,
               time: raw.ctime as number,
             }
             if (filter(data)) set.add(data.uid)
@@ -148,7 +148,7 @@ interface Data {
 
   const follow = async (uids: number[]): Promise<number[]> => {
     const resp = await req(`https://api.bilibili.com/x/relation/relations?fids=${uids.join(',')}`)
-    return resp === null ? [] : Object.keys(resp as Obj).map(Number)
+    return resp === null ? [] : Object.keys(resp as Dict).map(Number)
   }
 
   const pre = async (): Promise<number[]> => {
