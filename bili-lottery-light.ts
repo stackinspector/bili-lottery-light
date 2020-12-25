@@ -3,6 +3,8 @@
  * Copyright 2020 stackinspector(进栈检票). MIT Lincese.
  */
 
+type Obj = Record<string, unknown>
+
 type Needs = 'like' | 'reply' | 'repost'
 
 type Port = (tid: string, set: Set<number>) => Promise<void>
@@ -35,7 +37,7 @@ interface Data {
 
   if (config.blockself) config.blockuid.push(config.uid)
 
-  const req = async (url: string): Promise<any> => (await (await fetch(url, { credentials: 'include' })).json()).data
+  const req = async (url: string): Promise<unknown> => (await (await fetch(url, { credentials: 'include' })).json()).data
 
   const intersect = (foo: Set<number>, bar: Set<number>): Set<number> => {
     const result = new Set<number>()
@@ -66,9 +68,9 @@ interface Data {
 
       do {
 
-        const resp = await req(url + pn)
+        const resp = await req(url + pn) as Obj
 
-        for (const raw of resp.item_likes) {
+        for (const raw of (resp.item_likes as Obj[])) {
           const data: Data = {
             uid: raw.uid as number,
             time: raw.time as number,
@@ -92,13 +94,13 @@ interface Data {
 
       do {
 
-        const resp = await req(url + pn)
+        const resp = await req(url + pn) as Obj
 
-        for (const raw of resp.items) {
+        for (const raw of (resp.items as Obj[])) {
           const data: Data = {
-            uid: raw.desc.uid as number,
-            content: JSON.parse(raw.card).item.content as string,
-            time: raw.desc.timestamp as number,
+            uid: (raw.desc as Obj).uid as number,
+            content: (JSON.parse(raw.card as string).item as Obj).content as string,
+            time: (raw.desc as Obj).timestamp as number,
           }
           if (filter(data)) set.add(data.uid)
         }
@@ -112,22 +114,22 @@ interface Data {
 
     reply: async (tid, set) => {
 
-      const desc = (await req(`https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${tid}`)).card.desc
-      const url = `https://api.bilibili.com/x/v2/reply?type=${Boolean(desc.r_type as number) ? 11 : 17}&oid=${desc.rid as number}&sort=0&ps=20&pn=`
+      const desc = ((await req(`https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${tid}`) as Obj).card as Obj).desc as Obj
+      const url = `https://api.bilibili.com/x/v2/reply?type=${(desc.r_type as number) ? 11 : 17}&oid=${desc.rid as number}&sort=0&ps=20&pn=`
 
-      let flag: boolean = true
+      let flag = true
       let pn = 0
 
       do {
 
-        const resp = await req(url + pn)
+        const resp = await req(url + pn) as Obj
 
         if (resp.replies !== null) {
 
-          for (const raw of resp.replies) {
+          for (const raw of (resp.replies as Obj[])) {
             const data: Data = {
               uid: raw.mid as number,
-              content: raw.content.message as string,
+              content: (raw.content as Obj).message as string,
               time: raw.ctime as number,
             }
             if (filter(data)) set.add(data.uid)
@@ -146,7 +148,7 @@ interface Data {
 
   const follow = async (uids: number[]): Promise<number[]> => {
     const resp = await req(`https://api.bilibili.com/x/relation/relations?fids=${uids.join(',')}`)
-    return resp === null ? [] : Object.keys(resp as object).map(Number)
+    return resp === null ? [] : Object.keys(resp as Obj).map(Number)
   }
 
   const pre = async (): Promise<number[]> => {
