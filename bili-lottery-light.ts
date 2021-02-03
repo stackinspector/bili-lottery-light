@@ -3,49 +3,17 @@
  * Copyright 2020 stackinspector(进栈检票). MIT Lincese.
  */
 
-type Dict = Record<string, unknown>
-
-type Needs = 'like' | 'reply' | 'repost'
-
-type Port = (tid: string, set: Set<number>) => Promise<void>
-
-interface Config {
-  uid: number
-  tid: string[]
-  needs: Record<Needs, boolean>
-  or: boolean
-  follow: boolean
-  count: number
-  endtime: number
-  blockuid: number[]
-  blockword: string[]
-  blockself: boolean
-}
-
-interface Result {
-  vaildcount: number
-  result: number[]
-}
-
-interface Filtee {
-  uid: number
-  content?: string
-  time: number
-}
+import type { Dict } from 'baseutil/fetchlot.ts'
+import { intersect } from 'baseutil/set.ts'
+import { randOrgEls } from 'baseutil/random.ts'
+import type { Needs, Port, Config, Result, Filtee } from './schema.ts'
+import type { Like, Repost, DynamicCard, Reply, Detail } from './api-schema.ts'
 
 (async (config: Config): Promise<Result> => {
 
   if (config.blockself) config.blockuid.push(config.uid)
 
   const req = async (url: string): Promise<unknown> => (await (await fetch(url, { credentials: 'include' })).json()).data
-
-  const intersect = (foo: Set<number>, bar: Set<number>): Set<number> => {
-    const result = new Set<number>()
-    for (const el of bar) {
-      if (foo.has(el)) result.add(el)
-    }
-    return result
-  }
 
   const filter = (data: Filtee) =>
     (data.time < config.endtime)
@@ -68,17 +36,17 @@ interface Filtee {
 
       do {
 
-        const resp = await req(url + pn) as Dict
+        const resp = await req(url + pn) as Like
 
-        for (const raw of (resp.item_likes as Dict[])) {
+        for (const raw of resp.item_likes) {
           const data: Filtee = {
-            uid: raw.uid as number,
-            time: raw.time as number,
+            uid: raw.uid,
+            time: raw.time,
           }
           if (filter(data)) set.add(data.uid)
         }
 
-        flag = Boolean(resp.has_more as number)
+        flag = Boolean(resp.has_more)
         pn += 1
 
       } while (flag)
@@ -94,19 +62,19 @@ interface Filtee {
 
       do {
 
-        const resp = await req(url + pn) as Dict
+        const resp = await req(url + pn) as Repost
 
-        for (const raw of (resp.items as Dict[])) {
+        for (const raw of resp.items) {
           const data: Filtee = {
-            uid: (raw.desc as Dict).uid as number,
-            content: (JSON.parse(raw.card as string).item as Dict).content as string,
-            time: (raw.desc as Dict).timestamp as number,
+            uid: raw.desc.uid,
+            content: (JSON.parse(raw.card) as DynamicCard).item.content,
+            time: raw.desc.timestamp,
           }
           if (filter(data)) set.add(data.uid)
         }
 
-        flag = Boolean(resp.has_more as number)
-        pn = resp.offset as string
+        flag = Boolean(resp.has_more)
+        pn = resp.offset
 
       } while (flag)
 
@@ -114,23 +82,23 @@ interface Filtee {
 
     reply: async (tid, set) => {
 
-      const desc = ((await req(`https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${tid}`) as Dict).card as Dict).desc as Dict
-      const url = `https://api.bilibili.com/x/v2/reply?type=${(desc.r_type as number) ? 11 : 17}&oid=${desc.rid as number}&sort=0&ps=20&pn=`
+      const desc = (await req(`https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/get_dynamic_detail?dynamic_id=${tid}`) as Detail).card.desc
+      const url = `https://api.bilibili.com/x/v2/reply?type=${desc.r_type ? 11 : 17}&oid=${desc.rid}&sort=0&ps=20&pn=`
 
       let flag = true
       let pn = 0
 
       do {
 
-        const resp = await req(url + pn) as Dict
+        const resp = await req(url + pn) as Reply
 
         if (resp.replies !== null) {
 
-          for (const raw of (resp.replies as Dict[])) {
+          for (const raw of resp.replies) {
             const data: Filtee = {
-              uid: raw.mid as number,
-              content: (raw.content as Dict).message as string,
-              time: raw.ctime as number,
+              uid: raw.mid,
+              content: raw.content.message,
+              time: raw.ctime,
             }
             if (filter(data)) set.add(data.uid)
           }
@@ -177,14 +145,9 @@ interface Filtee {
   const prepool = await pre()
   const pool = config.follow ? await follow(prepool) : prepool
 
-  // API returns text: `Set 1: 1, 2, 3, ...`
-  const random = JSON.parse('[' + (await (await fetch(
-    `https://www.random.org/integer-sets/?sets=1&num=${config.count}&min=0&max=${pool.length - 1}&seqnos=on&commas=on&sort=on&order=index&format=plain&rnd=new`
-  )).text()).slice(7) + ']') as number[]
-
   return {
     vaildcount: pool.length,
-    result: random.map((n) => pool[n])
+    result: await randOrgEls(pool, config.count)
   }
 
 })

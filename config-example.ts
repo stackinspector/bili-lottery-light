@@ -1,4 +1,5 @@
-export default {
+import type { Config } from './schema.ts'
+export const example: Config = {
   /** 抽奖发起者的uid */
   uid: 573732342,
   /** 至少一个或多个抽奖动态的tid（目前为18位），注意要字符串形式（因为超过了JS最大安全整数） */
